@@ -1,5 +1,2 @@
-Plaintext
-streamlit
-numpy
-plotly
 scipy
+plotly

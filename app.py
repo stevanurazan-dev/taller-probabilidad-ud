@@ -3,80 +3,63 @@ import numpy as np
 import plotly.graph_objects as go
 from scipy.stats import binom, poisson
 
-# Configuración de la página
-st.set_page_config(page_title="Desafío de Ingeniería: Binomial vs Poisson", layout="wide")
+# 1. Configuración inicial de la página web
+st.set_page_config(page_title="Taller Probabilidad", layout="centered")
 
-st.title("📊 Laboratorio Interactivo: Aproximación de Poisson a la Binomial")
-st.markdown("""
-*Este tablero interactivo resuelve el Punto 2 del Taller de Distribuciones, demostrando la convergencia 
-de una red de sensores de alta fidelidad mediante simulación estocástica y visualización algorítmica.*
-""")
+st.title("📊 Laboratorio Interactivo: Binomial vs Poisson")
+st.markdown("### Universidad Distrital Francisco José de Caldas")
+st.markdown("Solución interactiva y simulación estocástica para el Punto 2.")
 
-# Parámetros fijos según el enunciado para evitar renderizados infinitos en la carga inicial
+# 2. Entrada de datos en la barra lateral
 st.sidebar.header("⚙️ Parámetros del Sistema")
-n = st.sidebar.slider("Número de nodos (n)", min_value=10, max_value=3000, value=1500, step=10)
-p = st.sidebar.slider("Probabilidad de fallo (p)", min_value=0.0005, max_value=0.05, value=0.002, step=0.0005, format="%.4f")
-k_target = st.sidebar.number_input("Exactamente 'k' fallos a calcular", min_value=0, max_value=n, value=5)
+n = st.sidebar.slider("Número de nodos (n)", 10, 3000, 1500, 10)
+p = st.sidebar.slider("Probabilidad de fallo (p)", 0.0005, 0.05, 0.002, 0.0005, format="%.4f")
+k_target = st.sidebar.number_input("Exactamente 'k' fallos a calcular", value=5, min_value=0, max_value=n)
 
+# 3. Cálculos matemáticos
 lambda_param = n * p
-
-# --- SECCIÓN 1: CÁLCULOS MATEMÁTICOS ---
-st.header("1. Confrontación Analítica")
-
 prob_binom = binom.pmf(k_target, n, p)
 prob_poisson = poisson.pmf(k_target, lambda_param)
 error_absoluto = abs(prob_binom - prob_poisson)
 
-# Usamos contenedores fijos en lugar de columnas dinámicas para evitar el error de 'removeChild'
-with st.container():
-    col1, col2, col3 = st.columns(3)
-    col1.metric(label="Probabilidad Exacta (Binomial)", value=f"{prob_binom:.6f}")
-    col2.metric(label="Aproximación (Poisson, λ = {0:.2f})".format(lambda_param), value=f"{prob_poisson:.6f}")
-    col3.metric(label="Error Absoluto", value=f"{error_absoluto:.6e}")
+# 4. Mostrar resultados analíticos
+st.header("1. Confrontación Analítica")
+st.write(f"**Probabilidad Exacta (Binomial):** {prob_binom:.6f}")
+st.write(f"**Aproximación de Poisson (λ = {lambda_param:.2f}):** {prob_poisson:.6f}")
+st.write(f"**Error Absoluto de la Aproximación:** {error_absoluto:.6e}")
 
-# --- SECCIÓN 2: GRÁFICA DE CONVERGENCIA ---
-st.header("2. Visualización Algorítmica de las Distribuciones")
-st.markdown("Mueve los parámetros en la barra lateral para observar cómo divergen o convergen ambas distribuciones.")
+# 5. Gráfico de Convergencia con Plotly
+st.header("2. Visualización Algorítmica")
+st.write("A continuación se muestra cómo se superponen ambas distribuciones:")
 
-# Rango de fallos optimizado
-k_values = np.arange(max(0, int(lambda_param - 4*np.sqrt(lambda_param))), int(lambda_param + 4*np.sqrt(lambda_param)) + 5)
-binom_pmf_vals = binom.pmf(k_values, n, p)
-poisson_pmf_vals = poisson.pmf(k_values, lambda_param)
+# Generar rango de datos para el gráfico
+k_min = max(0, int(lambda_param - 4 * np.sqrt(lambda_param)))
+k_max = int(lambda_param + 4 * np.sqrt(lambda_param)) + 5
+k_values = np.arange(k_min, k_max)
+
+binom_vals = binom.pmf(k_values, n, p)
+poisson_vals = poisson.pmf(k_values, lambda_param)
 
 fig = go.Figure()
-fig.add_trace(go.Bar(x=k_values, y=binom_pmf_vals, name='Binomial Exacta', opacity=0.7, marker_color='#1f77b4'))
-fig.add_trace(go.Scatter(x=k_values, y=poisson_pmf_vals, name='Poisson (Límite)', mode='lines+markers', line=dict(color='#ff7f0e', width=3)))
+fig.add_trace(go.Bar(x=k_values, y=binom_vals, name='Binomial (Real)'))
+fig.add_trace(go.Scatter(x=k_values, y=poisson_vals, name='Poisson (Límite)', mode='lines+markers', line=dict(color='orange')))
 
-fig.update_layout(
-    xaxis_title="Número de nodos caídos (k)",
-    yaxis_title="Probabilidad P(X = k)",
-    barmode='overlay',
-    legend=dict(x=0.8, y=0.9),
-    margin=dict(l=20, r=20, t=20, b=20)
-)
+fig.update_layout(xaxis_title="Fallos (k)", yaxis_title="Probabilidad")
 st.plotly_chart(fig, use_container_width=True)
 
-# --- SECCIÓN 3: SIMULACIÓN ESTOCÁSTICA ---
-st.header("3. Simulación Estocástica en Vivo (Montecarlo)")
-st.markdown("Vamos a simular el comportamiento real de los sensores ejecutando experimentos aleatorios masivos.")
+# 6. Simulación de Montecarlo
+st.header("3. Simulación Estocástica (Montecarlo)")
+st.write("Ejecuta experimentos aleatorios masivos en la red de sensores:")
 
-num_simulaciones = st.selectbox("Número de iteraciones de la simulación", [10000, 50000, 100000], index=1)
+num_sim = st.selectbox("Iteraciones de simulación", [10000, 50000, 100000], index=0)
 
-# Inicializamos el estado para que la interfaz no intente redibujar elementos inexistentes antes de tiempo
-if 'simulado' not in st.session_state:
-    st.session_state.simulado = False
-
-if st.button("🚀 Ejecutar Simulación de Montecarlo"):
-    with st.spinner("Simulando fallos en la red..."):
-        simulaciones = np.random.binomial(n, p, num_simulaciones)
-        st.session_state.exitos_simulados = int(np.sum(simulaciones == k_target))
-        st.session_state.prob_simulada = float(st.session_state.exitos_simulados / num_simulaciones)
-        st.session_state.simulado = True
-
-if st.session_state.simulado:
-    st.success("¡Simulación completada con éxito!")
-    with st.container():
-        col_sim1, col_sim2 = st.columns(2)
-        col_sim1.markdown(f"**Resultados del experimento:**\n* En **{num_simulaciones:}** redes simuladas de {n} nodos...\n* En **{st.session_state.exitos_simulados:}** ocasiones fallaron exactamente {k_target} nodos.")
-        col_sim2.metric(label="Probabilidad Empírica (Simulada)", value=f"{st.session_state.prob_simulada:.6f}", 
-                        delta=f"Dif. Teórica: {abs(st.session_state.prob_simulada - prob_binom):.6f}", delta_color="inverse")
+if st.button("🚀 Ejecutar Simulación"):
+    # Simulación directa usando generación binomial aleatoria masiva
+    simulaciones = np.random.binomial(n, p, num_sim)
+    exitos = np.sum(simulaciones == k_target)
+    prob_sim = exitos / num_sim
+    
+    st.success("¡Simulación completada!")
+    st.write(f"- En **{num_sim:,}** redes simuladas de {n} nodos...")
+    st.write(f"- En **{exitos:,}** ocasiones fallaron exactamente {k_target} nodos.")
+    st.write(f"- **Probabilidad Empírica Simulada:** {prob_sim:.6f}")
